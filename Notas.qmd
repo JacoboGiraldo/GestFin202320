@@ -1,0 +1,159 @@
+---
+title: "Notas Gestion Financiera 2023-20"
+format:
+  html:
+    page-layout: full
+server: shiny
+---
+
+```{r}
+#| context: setup
+#| warning: false
+library(ggplot2)
+library(dplyr)
+library(readr)
+notas <- read_csv("Notas20231018.csv", 
+    locale = locale(decimal_mark = ","))
+prueba1 <- read_csv("Notas20231018Prueba1.csv", 
+    locale = locale(decimal_mark = ","))
+names(notas)[7] <- "Hito 1"
+# prueba1 <- read_csv("code/AppNotas/Notas20231018Prueba1.csv", 
+    # locale = locale(decimal_mark = ","))
+# notas <- read_csv("code/AppNotas/Notas20231018.csv",
+    # locale = locale(decimal_mark = ","))
+```
+
+
+```{r}
+textInput("rut",
+                "RUT (sin guión ni puntos):",
+                value = "123456789")
+```
+
+
+```{r}
+textOutput("saludo")
+plotOutput("distPlot")
+```
+
+## Prueba 1
+
+```{r}
+dataTableOutput('detallePrueba1')
+```
+
+Tu nota sin bonificación es un 
+
+```{r}
+textOutput("prueba1")
+```
+
+Se entregaron máximo 2 décimas por cada pregunta bonus y 2 décimas si la diferencia entre tu puntaje estimado y el real fue menor a la media, en tu caso:
+
+```{r}
+dataTableOutput('bonusPrueba1')
+```
+
+
+## Proyecto
+
+```{r}
+dataTableOutput('proyecto')
+```
+
+## Controles
+
+```{r}
+h6("Falta cruzar asistencia")
+dataTableOutput('controles')
+```
+
+## Participación
+
+```{r}
+h6("Falta corrección por evaluaciones faltantes")
+dataTableOutput('participa')
+```
+
+
+```{r}
+sliderInput("bins", "Número de intervalos para histograma:", 
+            min = 1, max = 14, value = 12)
+```
+
+
+```{r}
+h6("Actualización: 18 Oct 2023")
+```
+
+
+
+```{r}
+#| context: server
+
+## Saludo personalizado con nombre
+output$saludo <- renderText({ 
+    paste("Hola",sub("^.*?,\\s*", "",notas$Student[which(notas$`SIS User ID`==input$rut)]),
+          ""
+          # " tu nota ahora es", 
+          # round((notas %>% filter(`SIS User ID`==input$rut) %>% select(`Prueba 1`))$`Prueba 1`,digits=1)
+          )
+  })
+
+## Histograma notas
+output$distPlot <- renderPlot({
+   x <- notas$`Prueba 1` # Old Faithful Geyser data
+   bins <- seq(1, 7, length.out = input$bins + 1)
+   hist(x, 
+        breaks = bins,
+        col = 'darkgray', border = 'white',
+        xlab = 'Nota',
+        main = 'Distribución Notas Prueba 1')
+   abline(v = (notas %>% filter(`SIS User ID`==input$rut) %>% select(`Prueba 1`))$`Prueba 1`, col="red", lwd=3, lty=2)
+    legend("bottomleft", legend = "Nota", pch = "|", col = "red")
+})
+
+## nota prueba 1
+output$prueba1 <- renderText({ 
+    paste(round((prueba1 %>% filter(`SIS User ID`==input$rut) %>% select(Nota))$Nota,digits=1))
+  })
+
+## Tabla detalle prueba 1
+
+output$detallePrueba1 <- renderDataTable(prueba1 %>% filter(`SIS User ID`==input$rut) %>% select(`Parte 1`,a:j,Total,`Nota+Esti`),
+                                  options = 
+                                    list(searching = FALSE, paging=FALSE) )
+
+
+## Dataframe reactivo para subtable de bonus
+bonus <- reactive(
+  prueba1 %>% filter(`SIS User ID`==input$rut) %>% select(k:l,`Delta Real/Est`)
+)
+
+## Tabla detalle bonus Prueba 1
+output$bonusPrueba1 <- renderDataTable(
+    data.frame(`Bonus 1`=ifelse(bonus()$k[1]<18,0.2,ifelse(is.na(bonus()$k[1]),0,0.1)),
+               `Bonus 2`=ifelse(bonus()$l[1]<17,0.2,ifelse(is.na(bonus()$l[1]),0,0.1)),
+               Estimado=ifelse(bonus()$`Delta Real/Est`[1]<7,0.2,0)),
+options = 
+  list(searching = FALSE, paging=FALSE)
+)
+
+## Tabla detalle Proyecto
+
+output$proyecto <- renderDataTable(notas %>% filter(`SIS User ID`==input$rut) %>% select(`Hito 1`:`Reporte Grupal 1`),
+                                  options = 
+                                    list(searching = FALSE, paging=FALSE) )
+
+## Tabla detalle controles
+output$controles <- renderDataTable(notas %>% filter(`SIS User ID`==input$rut) %>% select(`Control Diagnóstico`:`Control 7`),
+                                  options = 
+                                    list(searching = FALSE, paging=FALSE) )
+
+## Tabla detalle participación
+
+output$participa <- renderDataTable(notas %>% filter(`SIS User ID`==input$rut) %>% select(`Participación 1`:`Participación 7`),
+                                  options = 
+                                    list(searching = FALSE, paging=FALSE) )
+
+```
